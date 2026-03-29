@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { getUserBacktests } from "../services/firestoreService";
 import { OverlayChart } from "../components/BacktestCharts";
+import { formatTickerDisplay } from "../utils/formatters";
 
 const API_BASE = "http://localhost:8000";
 const COLORS = ["#6366f1", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f43f5e"];
@@ -143,7 +144,7 @@ export default function CompareBacktests() {
       results.forEach((res, index) => {
         const runKey = `run_${res.id}`;
         const color = COLORS[index % COLORS.length];
-        const displayLabel = `${res.meta.ticker} ${renderParams(res.meta)}`;
+        const displayLabel = `${formatTickerDisplay(res.meta.ticker)} ${renderParams(res.meta)}`;
         
         if (res.data.from_cache) {
           cacheCount++;
@@ -365,7 +366,7 @@ export default function CompareBacktests() {
                           style={{ accentColor: "#6366f1", cursor: "pointer", width: "16px", height: "16px" }}
                         />
                       </td>
-                      <td>{bt.ticker}</td>
+                      <td>{formatTickerDisplay(bt.ticker)}</td>
                       <td>
                         <span className="table-badge badge-muted">
                           {renderParams(bt)}

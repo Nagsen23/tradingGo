@@ -3,12 +3,20 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { saveStrategy } from "../services/firestoreService";
 
-const TICKERS = [
+const US_TICKERS = [
   { symbol: "AAPL", name: "Apple Inc." },
   { symbol: "GOOGL", name: "Alphabet Inc." },
   { symbol: "TSLA", name: "Tesla Inc." },
   { symbol: "MSFT", name: "Microsoft Corp." },
   { symbol: "AMZN", name: "Amazon.com Inc." },
+];
+
+const IN_TICKERS = [
+  { symbol: "RELIANCE", name: "Reliance Industries" },
+  { symbol: "TCS", name: "Tata Consultancy Services" },
+  { symbol: "INFY", name: "Infosys" },
+  { symbol: "HDFCBANK", name: "HDFC Bank" },
+  { symbol: "ICICIBANK", name: "ICICI Bank" },
 ];
 
 export default function StrategyBuilder() {
@@ -17,8 +25,12 @@ export default function StrategyBuilder() {
 
   // Form state
   const [name, setName] = useState("");
+  const [market, setMarket] = useState("US");
   const [ticker, setTicker] = useState("AAPL");
+  const [customTicker, setCustomTicker] = useState("");
   const [type, setType] = useState("sma_crossover");
+
+  const activeTickers = market === "US" ? US_TICKERS : IN_TICKERS;
   const [params, setParams] = useState({
     short_window: 10,
     long_window: 30,
@@ -56,11 +68,16 @@ export default function StrategyBuilder() {
       }
     }
 
+    let finalTicker = customTicker.trim() || ticker.trim();
+    if (market === "IN" && !finalTicker.toUpperCase().endsWith(".NS")) {
+      finalTicker = `${finalTicker}.NS`;
+    }
+
     setSaving(true);
     try {
       const docId = await saveStrategy(currentUser.uid, {
         name: name.trim(),
-        ticker,
+        ticker: finalTicker,
         type,
         params,
         initialCapital,
@@ -155,13 +172,29 @@ export default function StrategyBuilder() {
             {/* Row 2: Ticker + Type */}
             <div className="sb-form-row">
               <div className="form-group">
+                <label htmlFor="sb-market">Market</label>
+                <select
+                  id="sb-market"
+                  value={market}
+                  onChange={(e) => {
+                    setMarket(e.target.value);
+                    setCustomTicker("");
+                    setTicker(e.target.value === "IN" ? "RELIANCE" : "AAPL");
+                  }}
+                >
+                  <option value="US">US</option>
+                  <option value="IN">India</option>
+                </select>
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="sb-ticker">Ticker</label>
                 <select
                   id="sb-ticker"
                   value={ticker}
-                  onChange={(e) => setTicker(e.target.value)}
+                  onChange={(e) => { setTicker(e.target.value); setCustomTicker(""); }}
                 >
-                  {TICKERS.map((t) => (
+                  {activeTickers.map((t) => (
                     <option key={t.symbol} value={t.symbol}>
                       {t.symbol} — {t.name}
                     </option>
@@ -169,6 +202,20 @@ export default function StrategyBuilder() {
                 </select>
               </div>
 
+              <div className="form-group">
+                <label htmlFor="sb-custom">Or Custom</label>
+                <input
+                  id="sb-custom"
+                  type="text"
+                  placeholder={market === "IN" ? "e.g. TATAMOTORS" : "e.g. AMD"}
+                  value={customTicker}
+                  onChange={(e) => setCustomTicker(e.target.value.toUpperCase())}
+                  maxLength={15}
+                />
+              </div>
+            </div>
+
+            <div className="sb-form-row" style={{ marginTop: "1.5rem" }}>
               <div className="form-group">
                 <label htmlFor="sb-type">Strategy Type</label>
                 <select id="sb-type" value={type} onChange={(e) => setType(e.target.value)}>

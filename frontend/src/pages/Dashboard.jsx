@@ -9,6 +9,7 @@ import {
   updateStrategyStatus,
 } from "../services/firestoreService";
 import { EquityCurveChart, DrawdownChart } from "../components/BacktestCharts";
+import { formatTickerDisplay } from "../utils/formatters";
 
 const API_BASE = "http://localhost:8000";
 
@@ -50,8 +51,11 @@ export default function Dashboard() {
   const [btSaved, setBtSaved] = useState(false);
   const [btSourceStrategy, setBtSourceStrategy] = useState(null);
 
+  // Market selection
+  const [btMarket, setBtMarket] = useState("US");
+
   // Available tickers
-  const [tickers, setTickers] = useState([
+  const US_TICKERS = [
     { symbol: "AAPL", name: "Apple Inc." },
     { symbol: "GOOGL", name: "Alphabet Inc." },
     { symbol: "MSFT", name: "Microsoft Corp." },
@@ -62,7 +66,23 @@ export default function Dashboard() {
     { symbol: "NFLX", name: "Netflix Inc." },
     { symbol: "JPM", name: "JPMorgan Chase" },
     { symbol: "V", name: "Visa Inc." },
-  ]);
+  ];
+
+  const IN_TICKERS = [
+    { symbol: "RELIANCE", name: "Reliance Industries" },
+    { symbol: "TCS", name: "Tata Consultancy Services" },
+    { symbol: "INFY", name: "Infosys" },
+    { symbol: "HDFCBANK", name: "HDFC Bank" },
+    { symbol: "ICICIBANK", name: "ICICI Bank" },
+    { symbol: "SBIN", name: "State Bank of India" },
+    { symbol: "LT", name: "Larsen & Toubro" },
+    { symbol: "ITC", name: "ITC Limited" },
+    { symbol: "HINDUNILVR", name: "Hindustan Unilever" },
+    { symbol: "BHARTIARTL", name: "Bharti Airtel" },
+  ];
+
+  // Derive active tickers based on market
+  const tickers = btMarket === "US" ? US_TICKERS : IN_TICKERS;
 
   // Backend status
   const [backendOnline, setBackendOnline] = useState(null);
@@ -126,7 +146,18 @@ export default function Dashboard() {
     setBtSaved(false);
     setBtRunning(true);
 
-    const effectiveTicker = btCustomTicker.trim() || btTicker;
+    let effectiveTicker = btCustomTicker.trim() || btTicker.trim();
+
+    if (!effectiveTicker) {
+      setBtError("Please select or enter a valid ticker.");
+      setBtRunning(false);
+      return;
+    }
+
+    // Append .NS if India is selected and not already appended
+    if (btMarket === "IN" && !effectiveTicker.toUpperCase().endsWith(".NS")) {
+      effectiveTicker = `${effectiveTicker}.NS`;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/run-backtest`, {
@@ -447,7 +478,7 @@ export default function Dashboard() {
                   {strategies.map((s) => (
                     <tr key={s.id} className={btSourceStrategy?.id === s.id ? "row-highlighted" : ""}>
                       <td className="td-primary">{s.name || "Untitled"}</td>
-                      <td>{s.ticker || "—"}</td>
+                      <td>{formatTickerDisplay(s.ticker)}</td>
                       <td>{s.type || "sma_crossover"}</td>
                       <td>${(s.initialCapital || 10000).toLocaleString()}</td>
                       <td>
@@ -508,6 +539,23 @@ export default function Dashboard() {
 
           <form onSubmit={handleRunBacktest} className="backtest-form">
             <div className="bt-form-grid bt-form-grid-6">
+              
+              <div className="form-group">
+                <label htmlFor="bt-market">Market</label>
+                <select
+                  id="bt-market"
+                  value={btMarket}
+                  onChange={(e) => { 
+                    setBtMarket(e.target.value); 
+                    setBtCustomTicker(""); 
+                    setBtTicker(e.target.value === "IN" ? "RELIANCE" : "AAPL");
+                  }}
+                >
+                  <option value="US">US</option>
+                  <option value="IN">India</option>
+                </select>
+              </div>
+
               <div className="form-group">
                 <label htmlFor="bt-ticker">Ticker</label>
                 <select
@@ -528,10 +576,10 @@ export default function Dashboard() {
                 <input
                   id="bt-custom-ticker"
                   type="text"
-                  placeholder="e.g. AMD"
+                  placeholder={btMarket === "IN" ? "e.g. TATAMOTORS" : "e.g. AMD"}
                   value={btCustomTicker}
                   onChange={(e) => { setBtCustomTicker(e.target.value.toUpperCase()); setBtSourceStrategy(null); }}
-                  maxLength={10}
+                  maxLength={15}
                 />
               </div>
 
@@ -675,7 +723,7 @@ export default function Dashboard() {
             <div className="bt-results">
               <div className="bt-results-header">
                 <h3>
-                  Results — {btResult.ticker}{" "}
+                  Results — {formatTickerDisplay(btResult.ticker)}{" "}
                   <span className="text-muted" style={{ fontWeight: 400, fontSize: "0.85rem" }}>
                     {btResult.strategy} • {btResult.start_date} → {btResult.end_date} • {btResult.data_points} days
                   </span>
@@ -861,7 +909,7 @@ export default function Dashboard() {
                   {backtests.map((bt) => (
                     <tr key={bt.id} className="row-clickable" onClick={() => navigate(`/backtest/${bt.id}`)}>
                       <td className="td-primary">{bt.strategyName || "SMA Crossover"}</td>
-                      <td>{bt.ticker || "—"}</td>
+                      <td>{formatTickerDisplay(bt.ticker)}</td>
                       <td>
                         {bt.returnPct !== undefined ? (
                           <span className={bt.returnPct >= 0 ? "text-green" : "text-red"}>

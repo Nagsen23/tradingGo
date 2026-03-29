@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getBacktestById } from "../services/firestoreService";
 import { EquityCurveChart, DrawdownChart } from "../components/BacktestCharts";
+import { formatTickerDisplay } from "../utils/formatters";
 
 const API_BASE = "http://localhost:8000";
 
@@ -173,7 +174,7 @@ export default function BacktestDetail() {
             <span className="gradient-text">{backtest.strategyName || "SMA Crossover"}</span>
           </h1>
           <p className="welcome-subtitle">
-            {backtest.ticker} • {renderParams(backtest)} • ${(backtest.initialCapital || 10000).toLocaleString()} capital
+            {formatTickerDisplay(backtest.ticker)} • {renderParams(backtest)} • ${(backtest.initialCapital || 10000).toLocaleString()} capital
             <br />
             {backtest.startDate && backtest.endDate ? `${backtest.startDate} → ${backtest.endDate} • ${backtest.dataPoints} days` : formatDate(backtest.createdAt)}
           </p>
