@@ -18,9 +18,19 @@ export default function StrategyBuilder() {
   // Form state
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("AAPL");
-  const [type] = useState("sma_crossover"); // only one type for now
-  const [shortWindow, setShortWindow] = useState(10);
-  const [longWindow, setLongWindow] = useState(30);
+  const [type, setType] = useState("sma_crossover");
+  const [params, setParams] = useState({
+    short_window: 10,
+    long_window: 30,
+    rsi_period: 14,
+    oversold: 30,
+    overbought: 70,
+    fast_period: 12,
+    slow_period: 26,
+    signal_period: 9,
+    window: 20,
+    num_std_dev: 2.0
+  });
   const [initialCapital, setInitialCapital] = useState(10000);
   const [status, setStatus] = useState("draft");
 
@@ -39,9 +49,11 @@ export default function StrategyBuilder() {
       setError("Strategy name is required.");
       return;
     }
-    if (shortWindow >= longWindow) {
-      setError("Short SMA must be less than Long SMA.");
-      return;
+    if (type === "sma_crossover" || type === "ema_crossover") {
+      if (params.short_window >= params.long_window) {
+        setError("Short window must be less than long window.");
+        return;
+      }
     }
 
     setSaving(true);
@@ -50,16 +62,13 @@ export default function StrategyBuilder() {
         name: name.trim(),
         ticker,
         type,
-        shortWindow,
-        longWindow,
+        params,
         initialCapital,
         status,
       });
       setSuccess(`Strategy "${name.trim()}" saved! (ID: ${docId.slice(0, 8)}...)`);
       // Reset form
       setName("");
-      setShortWindow(10);
-      setLongWindow(30);
       setInitialCapital(10000);
       setStatus("draft");
     } catch (err) {
@@ -162,8 +171,12 @@ export default function StrategyBuilder() {
 
               <div className="form-group">
                 <label htmlFor="sb-type">Strategy Type</label>
-                <select id="sb-type" value={type} disabled>
+                <select id="sb-type" value={type} onChange={(e) => setType(e.target.value)}>
                   <option value="sma_crossover">SMA Crossover</option>
+                  <option value="ema_crossover">EMA Crossover</option>
+                  <option value="rsi">RSI Mean Reversion</option>
+                  <option value="macd">MACD Crossover</option>
+                  <option value="bollinger">Bollinger Bands</option>
                 </select>
               </div>
             </div>
@@ -171,35 +184,81 @@ export default function StrategyBuilder() {
             {/* Row 3: Parameters */}
             <div className="sb-params-header">
               <h3>Parameters</h3>
-              <span className="sb-params-hint">Customize your SMA crossover settings</span>
+              <span className="sb-params-hint">Customize your strategy settings</span>
             </div>
 
             <div className="sb-form-row sb-form-row-3">
-              <div className="form-group">
-                <label htmlFor="sb-short">Short SMA</label>
-                <input
-                  id="sb-short"
-                  type="number"
-                  min="2"
-                  max="49"
-                  value={shortWindow}
-                  onChange={(e) => setShortWindow(Number(e.target.value))}
-                />
-                <span className="form-hint">Fast moving average</span>
-              </div>
+              {(type === "sma_crossover" || type === "ema_crossover") && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="sb-short">Short Window</label>
+                    <input type="number" min="2" max="100" value={params.short_window}
+                      onChange={(e) => setParams({ ...params, short_window: Number(e.target.value) })} />
+                    <span className="form-hint">Fast moving average</span>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="sb-long">Long Window</label>
+                    <input type="number" min="5" max="250" value={params.long_window}
+                      onChange={(e) => setParams({ ...params, long_window: Number(e.target.value) })} />
+                    <span className="form-hint">Slow moving average</span>
+                  </div>
+                </>
+              )}
+              
+              {type === "rsi" && (
+                <>
+                  <div className="form-group">
+                    <label>RSI Period</label>
+                    <input type="number" min="2" max="50" value={params.rsi_period}
+                      onChange={(e) => setParams({ ...params, rsi_period: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Oversold Threshold</label>
+                    <input type="number" min="10" max="49" value={params.oversold}
+                      onChange={(e) => setParams({ ...params, oversold: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Overbought Threshold</label>
+                    <input type="number" min="50" max="90" value={params.overbought}
+                      onChange={(e) => setParams({ ...params, overbought: Number(e.target.value) })} />
+                  </div>
+                </>
+              )}
 
-              <div className="form-group">
-                <label htmlFor="sb-long">Long SMA</label>
-                <input
-                  id="sb-long"
-                  type="number"
-                  min="5"
-                  max="100"
-                  value={longWindow}
-                  onChange={(e) => setLongWindow(Number(e.target.value))}
-                />
-                <span className="form-hint">Slow moving average</span>
-              </div>
+              {type === "macd" && (
+                <>
+                  <div className="form-group">
+                    <label>Fast Period</label>
+                    <input type="number" min="2" max="50" value={params.fast_period}
+                      onChange={(e) => setParams({ ...params, fast_period: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Slow Period</label>
+                    <input type="number" min="5" max="100" value={params.slow_period}
+                      onChange={(e) => setParams({ ...params, slow_period: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Signal Period</label>
+                    <input type="number" min="2" max="50" value={params.signal_period}
+                      onChange={(e) => setParams({ ...params, signal_period: Number(e.target.value) })} />
+                  </div>
+                </>
+              )}
+
+              {type === "bollinger" && (
+                <>
+                  <div className="form-group">
+                    <label>Window</label>
+                    <input type="number" min="5" max="100" value={params.window}
+                      onChange={(e) => setParams({ ...params, window: Number(e.target.value) })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Std Dev</label>
+                    <input type="number" step="0.1" min="0.5" max="4.0" value={params.num_std_dev}
+                      onChange={(e) => setParams({ ...params, num_std_dev: Number(e.target.value) })} />
+                  </div>
+                </>
+              )}
 
               <div className="form-group">
                 <label htmlFor="sb-capital">Initial Capital ($)</label>
@@ -230,11 +289,11 @@ export default function StrategyBuilder() {
                 </div>
                 <div className="sb-preview-item">
                   <span className="sb-preview-label">Type</span>
-                  <span className="sb-preview-value">SMA Crossover</span>
+                  <span className="sb-preview-value">{type.toUpperCase().replace("_", " ")}</span>
                 </div>
                 <div className="sb-preview-item">
-                  <span className="sb-preview-label">SMA</span>
-                  <span className="sb-preview-value">{shortWindow} / {longWindow}</span>
+                  <span className="sb-preview-label">Params</span>
+                  <span className="sb-preview-value">Dynamic</span>
                 </div>
                 <div className="sb-preview-item">
                   <span className="sb-preview-label">Capital</span>

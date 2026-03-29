@@ -6,6 +6,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import BacktestDetail from "./pages/BacktestDetail";
+import CompareBacktests from "./pages/CompareBacktests";
 import "./App.css";
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BacktestDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <ProtectedRoute>
+                <CompareBacktests />
               </ProtectedRoute>
             }
           />

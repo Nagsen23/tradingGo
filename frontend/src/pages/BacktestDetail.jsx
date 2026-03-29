@@ -52,10 +52,11 @@ export default function BacktestDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ticker: bt.ticker || "AAPL",
-          strategy: "sma_crossover",
-          short_window: bt.shortWindow || 10,
-          long_window: bt.longWindow || 30,
+          strategy: bt.strategyType || (bt.strategyName && !bt.strategyName.includes("Strategy") ? bt.strategyName : "sma_crossover"),
+          params: bt.params || { short_window: bt.shortWindow || 10, long_window: bt.longWindow || 30 },
           initial_capital: bt.initialCapital || 10000,
+          start_date: bt.startDate || null,
+          end_date: bt.endDate || null,
         }),
       });
       if (res.ok) {
@@ -77,6 +78,24 @@ export default function BacktestDetail() {
     else return "—";
     if (isNaN(date.getTime())) return "—";
     return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function renderParams(bt) {
+    if (bt.params && Object.keys(bt.params).length > 0) {
+      if (bt.strategyName?.includes("sma") || bt.strategyName?.includes("ema")) {
+        return `${bt.strategyName.toUpperCase().split("_")[0]}(${bt.params.short_window}/${bt.params.long_window})`;
+      } else if (bt.strategyName === "rsi") {
+        return `RSI(${bt.params.rsi_period}) [${bt.params.oversold}-${bt.params.overbought}]`;
+      } else if (bt.strategyName === "macd") {
+        return `MACD(${bt.params.fast_period}, ${bt.params.slow_period}, ${bt.params.signal_period})`;
+      } else if (bt.strategyName === "bollinger") {
+        return `BB(${bt.params.window}, ${bt.params.num_std_dev})`;
+      }
+      // generic
+      return "Custom Params";
+    }
+    // Legacy fallback
+    return `SMA(${bt.shortWindow || 10}/${bt.longWindow || 30})`;
   }
 
   if (loading) {
@@ -154,7 +173,9 @@ export default function BacktestDetail() {
             <span className="gradient-text">{backtest.strategyName || "SMA Crossover"}</span>
           </h1>
           <p className="welcome-subtitle">
-            {backtest.ticker} • SMA({backtest.shortWindow || 10}/{backtest.longWindow || 30}) • ${(backtest.initialCapital || 10000).toLocaleString()} capital • {formatDate(backtest.createdAt)}
+            {backtest.ticker} • {renderParams(backtest)} • ${(backtest.initialCapital || 10000).toLocaleString()} capital
+            <br />
+            {backtest.startDate && backtest.endDate ? `${backtest.startDate} → ${backtest.endDate} • ${backtest.dataPoints} days` : formatDate(backtest.createdAt)}
           </p>
         </div>
 
@@ -186,6 +207,46 @@ export default function BacktestDetail() {
             <span className="bt-metric-label">Max Drawdown</span>
             <span className="bt-metric-value text-red">-{backtest.maxDrawdown?.toFixed(2)}%</span>
           </div>
+          {backtest.sharpeRatio !== undefined && backtest.sharpeRatio !== null && (
+            <div className="bt-metric">
+              <span className="bt-metric-label">Sharpe Ratio</span>
+              <span className={`bt-metric-value ${backtest.sharpeRatio >= 1 ? "text-green" : backtest.sharpeRatio >= 0 ? "text-muted" : "text-red"}`}>
+                {backtest.sharpeRatio.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {backtest.profitFactor !== undefined && backtest.profitFactor !== null && (
+            <div className="bt-metric">
+              <span className="bt-metric-label">Profit Factor</span>
+              <span className={`bt-metric-value ${backtest.profitFactor >= 1 ? "text-green" : "text-red"}`}>
+                {backtest.profitFactor >= 999 ? "∞" : backtest.profitFactor.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {backtest.cagrPct !== undefined && backtest.cagrPct !== null && (
+            <div className="bt-metric">
+              <span className="bt-metric-label">CAGR</span>
+              <span className={`bt-metric-value ${backtest.cagrPct >= 0 ? "text-green" : "text-red"}`}>
+                {backtest.cagrPct >= 0 ? "+" : ""}{backtest.cagrPct.toFixed(2)}%
+              </span>
+            </div>
+          )}
+          {backtest.sortinoRatio !== undefined && backtest.sortinoRatio !== null && (
+            <div className="bt-metric">
+              <span className="bt-metric-label">Sortino Ratio</span>
+              <span className={`bt-metric-value ${backtest.sortinoRatio >= 1 ? "text-green" : backtest.sortinoRatio >= 0 ? "text-muted" : "text-red"}`}>
+                {backtest.sortinoRatio.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {backtest.calmarRatio !== undefined && backtest.calmarRatio !== null && (
+            <div className="bt-metric">
+              <span className="bt-metric-label">Calmar Ratio</span>
+              <span className={`bt-metric-value ${backtest.calmarRatio >= 1 ? "text-green" : backtest.calmarRatio >= 0 ? "text-muted" : "text-red"}`}>
+                {backtest.calmarRatio.toFixed(2)}
+              </span>
+            </div>
+          )}
           <div className="bt-metric">
             <span className="bt-metric-label">Avg Win</span>
             <span className="bt-metric-value text-green">${backtest.avgWin?.toFixed(2)}</span>

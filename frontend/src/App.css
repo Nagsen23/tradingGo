@@ -686,8 +686,14 @@
   margin-bottom: 1rem;
 }
 
+.bt-form-grid-6 {
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+}
+
 .backtest-form select,
-.backtest-form input[type="number"] {
+.backtest-form input[type="number"],
+.backtest-form input[type="date"],
+.backtest-form input[type="text"] {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -750,6 +756,19 @@
   background: rgba(34, 197, 94, 0.12);
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
+}
+
+.bt-data-source {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(148, 163, 184, 0.05);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  width: fit-content;
 }
 
 /* Metrics grid */

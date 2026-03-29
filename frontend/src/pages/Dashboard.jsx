@@ -23,9 +23,27 @@ export default function Dashboard() {
 
   // Backtest form state
   const [btTicker, setBtTicker] = useState("AAPL");
-  const [btShortWindow, setBtShortWindow] = useState(10);
-  const [btLongWindow, setBtLongWindow] = useState(30);
+  const [btCustomTicker, setBtCustomTicker] = useState("");
+  const [btType, setBtType] = useState("sma_crossover");
+  const [btParams, setBtParams] = useState({
+    short_window: 10,
+    long_window: 30,
+    rsi_period: 14,
+    oversold: 30,
+    overbought: 70,
+    fast_period: 12,
+    slow_period: 26,
+    signal_period: 9,
+    window: 20,
+    num_std_dev: 2.0
+  });
   const [btCapital, setBtCapital] = useState(10000);
+  const [btStartDate, setBtStartDate] = useState(
+    new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+  );
+  const [btEndDate, setBtEndDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [btRunning, setBtRunning] = useState(false);
   const [btResult, setBtResult] = useState(null);
   const [btError, setBtError] = useState("");
@@ -36,9 +54,14 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState([
     { symbol: "AAPL", name: "Apple Inc." },
     { symbol: "GOOGL", name: "Alphabet Inc." },
-    { symbol: "TSLA", name: "Tesla Inc." },
     { symbol: "MSFT", name: "Microsoft Corp." },
     { symbol: "AMZN", name: "Amazon.com Inc." },
+    { symbol: "TSLA", name: "Tesla Inc." },
+    { symbol: "META", name: "Meta Platforms Inc." },
+    { symbol: "NVDA", name: "NVIDIA Corp." },
+    { symbol: "NFLX", name: "Netflix Inc." },
+    { symbol: "JPM", name: "JPMorgan Chase" },
+    { symbol: "V", name: "Visa Inc." },
   ]);
 
   // Backend status
@@ -72,23 +95,15 @@ export default function Dashboard() {
       try {
         const res = await fetch(`${API_BASE}/api/health`);
         if (res.ok) {
-          const data = await res.json();
           setBackendOnline(true);
-          if (data.available_tickers) {
-            const tickerNames = {
-              AAPL: "Apple Inc.",
-              GOOGL: "Alphabet Inc.",
-              TSLA: "Tesla Inc.",
-              MSFT: "Microsoft Corp.",
-              AMZN: "Amazon.com Inc.",
-            };
-            setTickers(
-              data.available_tickers.map((t) => ({
-                symbol: t,
-                name: tickerNames[t] || t,
-              }))
-            );
-          }
+          // Fetch suggested tickers
+          try {
+            const tickerRes = await fetch(`${API_BASE}/api/tickers`);
+            if (tickerRes.ok) {
+              const tickerData = await tickerRes.json();
+              if (tickerData.tickers) setTickers(tickerData.tickers);
+            }
+          } catch { /* keep defaults */ }
         } else {
           setBackendOnline(false);
         }
@@ -111,16 +126,19 @@ export default function Dashboard() {
     setBtSaved(false);
     setBtRunning(true);
 
+    const effectiveTicker = btCustomTicker.trim() || btTicker;
+
     try {
       const res = await fetch(`${API_BASE}/api/run-backtest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ticker: btTicker,
-          strategy: "sma_crossover",
-          short_window: btShortWindow,
-          long_window: btLongWindow,
+          ticker: effectiveTicker,
+          strategy: btType,
+          params: btParams,
           initial_capital: btCapital,
+          start_date: btStartDate || null,
+          end_date: btEndDate || null,
         }),
       });
 
@@ -136,9 +154,12 @@ export default function Dashboard() {
       try {
         await saveBacktestRun(currentUser.uid, {
           ...data,
-          short_window: btShortWindow,
-          long_window: btLongWindow,
+          params: btParams,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          data_points: data.data_points,
           strategyName: btSourceStrategy?.name || data.strategy,
+          strategyType: data.strategy,
         });
         setBtSaved(true);
 
@@ -158,8 +179,15 @@ export default function Dashboard() {
    */
   function handleRunFromStrategy(strategy) {
     setBtTicker(strategy.ticker || "AAPL");
-    setBtShortWindow(strategy.shortWindow || 10);
-    setBtLongWindow(strategy.longWindow || 30);
+    setBtType(strategy.type || "sma_crossover");
+    const newParams = { ...btParams };
+    if (strategy.params) {
+      Object.assign(newParams, strategy.params);
+    } else if (strategy.shortWindow && strategy.longWindow) { // Legacy
+      newParams.short_window = strategy.shortWindow;
+      newParams.long_window = strategy.longWindow;
+    }
+    setBtParams(newParams);
     setBtCapital(strategy.initialCapital || 10000);
     setBtSourceStrategy(strategy);
     setBtResult(null);
@@ -267,6 +295,12 @@ export default function Dashboard() {
               {backendOnline ? "● API Online" : "● API Offline"}
             </span>
           )}
+          <button
+            onClick={() => navigate("/compare")}
+            className="nav-link-btn"
+          >
+            ⚖️ Compare
+          </button>
           <button
             onClick={() => navigate("/strategy-builder")}
             className="nav-link-btn"
@@ -402,7 +436,7 @@ export default function Dashboard() {
                   <tr>
                     <th>Name</th>
                     <th>Ticker</th>
-                    <th>SMA</th>
+                    <th>Type</th>
                     <th>Capital</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -414,7 +448,7 @@ export default function Dashboard() {
                     <tr key={s.id} className={btSourceStrategy?.id === s.id ? "row-highlighted" : ""}>
                       <td className="td-primary">{s.name || "Untitled"}</td>
                       <td>{s.ticker || "—"}</td>
-                      <td>{s.shortWindow || 10}/{s.longWindow || 30}</td>
+                      <td>{s.type || "sma_crossover"}</td>
                       <td>${(s.initialCapital || 10000).toLocaleString()}</td>
                       <td>
                         <button
@@ -473,13 +507,13 @@ export default function Dashboard() {
           </div>
 
           <form onSubmit={handleRunBacktest} className="backtest-form">
-            <div className="bt-form-grid">
+            <div className="bt-form-grid bt-form-grid-6">
               <div className="form-group">
                 <label htmlFor="bt-ticker">Ticker</label>
                 <select
                   id="bt-ticker"
                   value={btTicker}
-                  onChange={(e) => { setBtTicker(e.target.value); setBtSourceStrategy(null); }}
+                  onChange={(e) => { setBtTicker(e.target.value); setBtCustomTicker(""); setBtSourceStrategy(null); }}
                 >
                   {tickers.map((t) => (
                     <option key={t.symbol} value={t.symbol}>
@@ -490,28 +524,119 @@ export default function Dashboard() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="bt-short">Short SMA</label>
+                <label htmlFor="bt-custom-ticker">Or Custom</label>
                 <input
-                  id="bt-short"
-                  type="number"
-                  min="2"
-                  max="49"
-                  value={btShortWindow}
-                  onChange={(e) => { setBtShortWindow(Number(e.target.value)); setBtSourceStrategy(null); }}
+                  id="bt-custom-ticker"
+                  type="text"
+                  placeholder="e.g. AMD"
+                  value={btCustomTicker}
+                  onChange={(e) => { setBtCustomTicker(e.target.value.toUpperCase()); setBtSourceStrategy(null); }}
+                  maxLength={10}
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="bt-long">Long SMA</label>
+                <label htmlFor="bt-start">Start Date</label>
                 <input
-                  id="bt-long"
-                  type="number"
-                  min="5"
-                  max="100"
-                  value={btLongWindow}
-                  onChange={(e) => { setBtLongWindow(Number(e.target.value)); setBtSourceStrategy(null); }}
+                  id="bt-start"
+                  type="date"
+                  value={btStartDate}
+                  onChange={(e) => { setBtStartDate(e.target.value); setBtSourceStrategy(null); }}
                 />
               </div>
+
+              <div className="form-group">
+                <label htmlFor="bt-end">End Date</label>
+                <input
+                  id="bt-end"
+                  type="date"
+                  value={btEndDate}
+                  onChange={(e) => { setBtEndDate(e.target.value); setBtSourceStrategy(null); }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bt-type">Strategy</label>
+                <select
+                  id="bt-type"
+                  value={btType}
+                  onChange={(e) => { setBtType(e.target.value); setBtSourceStrategy(null); }}
+                >
+                  <option value="sma_crossover">SMA Crossover</option>
+                  <option value="ema_crossover">EMA Crossover</option>
+                  <option value="rsi">RSI Mean Reversion</option>
+                  <option value="macd">MACD Crossover</option>
+                  <option value="bollinger">Bollinger Bands</option>
+                </select>
+              </div>
+
+              {/* Dynamic Strategy Params */}
+              {(btType === "sma_crossover" || btType === "ema_crossover") && (
+                <>
+                  <div className="form-group">
+                    <label>Short Window</label>
+                    <input type="number" min="2" max="100" value={btParams.short_window} 
+                           onChange={(e) => setBtParams({...btParams, short_window: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Long Window</label>
+                    <input type="number" min="5" max="250" value={btParams.long_window} 
+                           onChange={(e) => setBtParams({...btParams, long_window: Number(e.target.value)})} />
+                  </div>
+                </>
+              )}
+              {btType === "rsi" && (
+                <>
+                  <div className="form-group">
+                    <label>RSI Period</label>
+                    <input type="number" min="2" max="50" value={btParams.rsi_period} 
+                           onChange={(e) => setBtParams({...btParams, rsi_period: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Oversold</label>
+                    <input type="number" min="10" max="49" value={btParams.oversold} 
+                           onChange={(e) => setBtParams({...btParams, oversold: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Overbought</label>
+                    <input type="number" min="50" max="90" value={btParams.overbought} 
+                           onChange={(e) => setBtParams({...btParams, overbought: Number(e.target.value)})} />
+                  </div>
+                </>
+              )}
+              {btType === "macd" && (
+                <>
+                  <div className="form-group">
+                    <label>Fast Period</label>
+                    <input type="number" min="2" max="50" value={btParams.fast_period} 
+                           onChange={(e) => setBtParams({...btParams, fast_period: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Slow Period</label>
+                    <input type="number" min="5" max="100" value={btParams.slow_period} 
+                           onChange={(e) => setBtParams({...btParams, slow_period: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Signal Period</label>
+                    <input type="number" min="2" max="50" value={btParams.signal_period} 
+                           onChange={(e) => setBtParams({...btParams, signal_period: Number(e.target.value)})} />
+                  </div>
+                </>
+              )}
+              {btType === "bollinger" && (
+                <>
+                  <div className="form-group">
+                    <label>Window</label>
+                    <input type="number" min="5" max="100" value={btParams.window} 
+                           onChange={(e) => setBtParams({...btParams, window: Number(e.target.value)})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Std Dev</label>
+                    <input type="number" step="0.1" min="0.5" max="4.0" value={btParams.num_std_dev} 
+                           onChange={(e) => setBtParams({...btParams, num_std_dev: Number(e.target.value)})} />
+                  </div>
+                </>
+              )}
 
               <div className="form-group">
                 <label htmlFor="bt-capital">Capital ($)</label>
@@ -552,7 +677,7 @@ export default function Dashboard() {
                 <h3>
                   Results — {btResult.ticker}{" "}
                   <span className="text-muted" style={{ fontWeight: 400, fontSize: "0.85rem" }}>
-                    SMA({btShortWindow}/{btLongWindow})
+                    {btResult.strategy} • {btResult.start_date} → {btResult.end_date} • {btResult.data_points} days
                   </span>
                   {btSourceStrategy && (
                     <span className="bt-source-tag">via "{btSourceStrategy.name}"</span>
@@ -561,6 +686,15 @@ export default function Dashboard() {
                 {btSaved && (
                   <span className="bt-saved-badge">✓ Saved to Firestore</span>
                 )}
+                {btResult.from_cache && (
+                  <span className="bt-source-tag" style={{ marginLeft: "8px", background: "rgba(16, 185, 129, 0.2)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                    ⚡ Loaded from Cache
+                  </span>
+                )}
+              </div>
+
+              <div className="bt-data-source">
+                📡 Real market data from Yahoo Finance
               </div>
 
               <div className="bt-metrics-grid">
@@ -592,9 +726,39 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div className="bt-metric">
+                  <span className="bt-metric-label">Sharpe Ratio</span>
+                  <span className={`bt-metric-value ${btResult.metrics.sharpe_ratio >= 1 ? "text-green" : btResult.metrics.sharpe_ratio >= 0 ? "text-muted" : "text-red"}`}>
+                    {btResult.metrics.sharpe_ratio.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bt-metric">
+                  <span className="bt-metric-label">Profit Factor</span>
+                  <span className={`bt-metric-value ${btResult.metrics.profit_factor >= 1 ? "text-green" : "text-red"}`}>
+                    {btResult.metrics.profit_factor >= 999 ? "∞" : btResult.metrics.profit_factor.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bt-metric">
                   <span className="bt-metric-label">Avg Win</span>
                   <span className="bt-metric-value text-green">
                     ${btResult.metrics.avg_win.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bt-metric">
+                  <span className="bt-metric-label">CAGR</span>
+                  <span className={`bt-metric-value ${btResult.metrics.cagr_pct >= 0 ? "text-green" : "text-red"}`}>
+                    {btResult.metrics.cagr_pct >= 0 ? "+" : ""}{btResult.metrics.cagr_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="bt-metric">
+                  <span className="bt-metric-label">Sortino Ratio</span>
+                  <span className={`bt-metric-value ${btResult.metrics.sortino_ratio >= 1 ? "text-green" : btResult.metrics.sortino_ratio >= 0 ? "text-muted" : "text-red"}`}>
+                    {btResult.metrics.sortino_ratio.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bt-metric">
+                  <span className="bt-metric-label">Calmar Ratio</span>
+                  <span className={`bt-metric-value ${btResult.metrics.calmar_ratio >= 1 ? "text-green" : btResult.metrics.calmar_ratio >= 0 ? "text-muted" : "text-red"}`}>
+                    {btResult.metrics.calmar_ratio.toFixed(2)}
                   </span>
                 </div>
               </div>

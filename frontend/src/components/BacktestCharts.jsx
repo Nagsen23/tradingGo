@@ -7,25 +7,31 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
 
 /**
  * Custom tooltip that matches the dark theme.
  */
-function ChartTooltip({ active, payload, label, valuePrefix, valueSuffix }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip-label">{label}</p>
-      {payload.map((entry, idx) => (
-        <p key={idx} style={{ color: entry.color, margin: 0 }}>
-          {entry.name}: {valuePrefix || ""}
-          {typeof entry.value === "number" ? entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : entry.value}
-          {valueSuffix || ""}
-        </p>
-      ))}
-    </div>
-  );
+export function ChartTooltip({ active, payload, label, valuePrefix = "", valueSuffix = "" }) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="custom-tooltip">
+        <p className="tooltip-label">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={`item-${index}`} className="tooltip-item" style={{ color: entry.color }}>
+            <span className="tooltip-name">{entry.name}: </span>
+            <span className="tooltip-value">
+              {valuePrefix}{typeof entry.value === 'number' ? entry.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : entry.value}{valueSuffix}
+            </span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
 }
 
 /**
@@ -171,4 +177,57 @@ function sampleData(data, maxPoints) {
     result.push(data[data.length - 1]);
   }
   return result;
+}
+
+/**
+ * Overlay chart for comparing multiple equity curves.
+ * `data` looks like [{ date: '2025-01-01', "run_1": 10000, "run_2": 10000 }, ...]
+ * `lines` looks like [{ dataKey: "run_1", name: "SMA Crossover AAPL", color: "#6366f1" }]
+ */
+export function OverlayChart({ data, lines, isNormalized = false }) {
+  if (!data || data.length === 0 || !lines || lines.length === 0) return null;
+
+  // Sample data to prevent chart lag if it's too dense
+  const sampled = sampleData(data, 100);
+
+  return (
+    <div className="chart-container" style={{ padding: "0" }}>
+      <div className="chart-wrapper">
+        <ResponsiveContainer width="100%" height={380}>
+          <LineChart data={sampled} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.08)" vertical={false} />
+            <XAxis
+              dataKey="date"
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: "rgba(148,163,184,0.12)" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => isNormalized ? `${(v).toFixed(1)}%` : `$${(v / 1000).toFixed(1)}k`}
+              width={isNormalized ? 60 : 55}
+            />
+            <Tooltip content={<ChartTooltip valuePrefix={isNormalized ? "" : "$"} valueSuffix={isNormalized ? "%" : ""} />} />
+            <Legend wrapperStyle={{ paddingTop: "20px", fontSize: "14px", color: "#94a3b8" }} />
+            {lines.map((ln) => (
+              <Line
+                key={ln.dataKey}
+                type="monotone"
+                dataKey={ln.dataKey}
+                name={ln.name}
+                stroke={ln.color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 5, stroke: ln.color, strokeWidth: 2, fill: "#0b0e17" }}
+                connectNulls={true}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }

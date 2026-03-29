@@ -121,8 +121,10 @@ export async function saveStrategy(uid, strategyData) {
     name: strategyData.name,
     ticker: strategyData.ticker,
     type: strategyData.type || "sma_crossover",
-    shortWindow: strategyData.shortWindow || 10,
-    longWindow: strategyData.longWindow || 30,
+    params: strategyData.params || { 
+      short_window: strategyData.shortWindow || 10, 
+      long_window: strategyData.longWindow || 30 
+    },
     initialCapital: strategyData.initialCapital || 10000,
     status: strategyData.status || "draft",
     createdAt: serverTimestamp(),
@@ -232,7 +234,8 @@ export async function saveBacktestRun(uid, backtestData) {
   const docRef = await addDoc(collection(db, "backtest_runs"), {
     userId: uid,
     ticker: backtestData.ticker,
-    strategyName: backtestData.strategy || "SMA Crossover",
+    strategyName: backtestData.strategyName || backtestData.strategy || "sma_crossover",
+    strategyType: backtestData.strategyType || backtestData.strategy || "sma_crossover",
     returnPct: backtestData.metrics.total_return_pct,
     numTrades: backtestData.metrics.num_trades,
     winRate: backtestData.metrics.win_rate,
@@ -241,8 +244,22 @@ export async function saveBacktestRun(uid, backtestData) {
     finalEquity: backtestData.metrics.final_equity,
     avgWin: backtestData.metrics.avg_win,
     avgLoss: backtestData.metrics.avg_loss,
-    shortWindow: backtestData.short_window,
-    longWindow: backtestData.long_window,
+    sharpeRatio: backtestData.metrics.sharpe_ratio ?? null,
+    sortinoRatio: backtestData.metrics.sortino_ratio ?? null,
+    calmarRatio: backtestData.metrics.calmar_ratio ?? null,
+    cagrPct: backtestData.metrics.cagr_pct ?? null,
+    profitFactor: backtestData.metrics.profit_factor ?? null,
+    
+    // Generic parameter injection
+    params: backtestData.params || {},
+    
+    // Fallbacks for older dashboard views depending on explicitly extracted properties
+    shortWindow: backtestData.params?.short_window || backtestData.short_window || null,
+    longWindow: backtestData.params?.long_window || backtestData.long_window || null,
+    
+    startDate: backtestData.start_date || null,
+    endDate: backtestData.end_date || null,
+    dataPoints: backtestData.data_points || null,
     createdAt: serverTimestamp(),
   });
   return docRef.id;

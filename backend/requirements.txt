@@ -1,3 +1,10 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.0.0
+yfinance>=0.2.36
+TA-Lib>=0.4.28
+pydantic-settings>=2.2.1
+cachetools>=5.3.3
+fastapi-cache2[redis]>=0.2.1
+numpy>=1.26.4
+numba>=0.59.0
