@@ -248,3 +248,18 @@ export async function saveBacktestRun(uid, backtestData) {
   return docRef.id;
 }
 
+/**
+ * Fetch a single backtest run by its Firestore document ID.
+ *
+ * @param {string} backtestId - Firestore document ID.
+ * @returns {object|null}     - Backtest data or null if not found.
+ */
+export async function getBacktestById(backtestId) {
+  const docRef = doc(db, "backtest_runs", backtestId);
+  const snapshot = await getDoc(docRef);
+
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() };
+  }
+  return null;
+}

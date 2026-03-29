@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import StrategyBuilder from "./pages/StrategyBuilder";
+import BacktestDetail from "./pages/BacktestDetail";
 import "./App.css";
 
 function App() {
@@ -27,6 +28,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StrategyBuilder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/backtest/:id"
+            element={
+              <ProtectedRoute>
+                <BacktestDetail />
               </ProtectedRoute>
             }
           />

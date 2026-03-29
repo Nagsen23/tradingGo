@@ -78,6 +78,7 @@ class BacktestResponse(BaseModel):
     metrics: BacktestMetrics
     trades: list[TradeDetail]
     equity_curve: list[dict]
+    drawdown_curve: list[dict]
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
@@ -157,6 +158,7 @@ def run_backtest(request: BacktestRequest):
         metrics=BacktestMetrics(**result["metrics"]),
         trades=[TradeDetail(**t) for t in result["trades"]],
         equity_curve=result["equity_curve"],
+        drawdown_curve=result["drawdown_curve"],
     )
 
 

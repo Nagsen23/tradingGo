@@ -142,15 +142,20 @@ def sma_crossover_backtest(
     losing_trades = [t for t in trades if t["pnl"] <= 0]
     win_rate = (len(winning_trades) / num_trades * 100) if num_trades > 0 else 0.0
 
-    # Max drawdown
+    # Max drawdown + drawdown curve
     peak = initial_capital
     max_drawdown = 0.0
+    drawdown_curve = []
     for point in equity_curve:
         if point["equity"] > peak:
             peak = point["equity"]
         drawdown = ((peak - point["equity"]) / peak) * 100
         if drawdown > max_drawdown:
             max_drawdown = drawdown
+        drawdown_curve.append({
+            "date": point["date"],
+            "drawdown": round(drawdown, 2),
+        })
 
     # Average win / loss
     avg_win = (
@@ -181,4 +186,5 @@ def sma_crossover_backtest(
         "trades": trades,
         "metrics": metrics,
         "equity_curve": equity_curve,
+        "drawdown_curve": drawdown_curve,
     }

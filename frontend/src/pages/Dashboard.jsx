@@ -8,6 +8,7 @@ import {
   deleteStrategy,
   updateStrategyStatus,
 } from "../services/firestoreService";
+import { EquityCurveChart, DrawdownChart } from "../components/BacktestCharts";
 
 const API_BASE = "http://localhost:8000";
 
@@ -598,6 +599,17 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Charts */}
+              {btResult.equity_curve && btResult.equity_curve.length > 0 && (
+                <div className="charts-grid">
+                  <EquityCurveChart
+                    data={btResult.equity_curve}
+                    initialCapital={btCapital}
+                  />
+                  <DrawdownChart data={btResult.drawdown_curve} />
+                </div>
+              )}
+
               {btResult.trades.length > 0 && (
                 <div className="bt-trades-section">
                   <h4>Trade Log</h4>
@@ -678,11 +690,12 @@ export default function Dashboard() {
                     <th>Win Rate</th>
                     <th>Trades</th>
                     <th>Date</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {backtests.map((bt) => (
-                    <tr key={bt.id}>
+                    <tr key={bt.id} className="row-clickable" onClick={() => navigate(`/backtest/${bt.id}`)}>
                       <td className="td-primary">{bt.strategyName || "SMA Crossover"}</td>
                       <td>{bt.ticker || "—"}</td>
                       <td>
@@ -698,6 +711,9 @@ export default function Dashboard() {
                       <td>{bt.winRate !== undefined ? `${bt.winRate}%` : "—"}</td>
                       <td>{bt.numTrades ?? "—"}</td>
                       <td>{formatDate(bt.createdAt)}</td>
+                      <td>
+                        <span className="small-action-btn btn-accent">View →</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
