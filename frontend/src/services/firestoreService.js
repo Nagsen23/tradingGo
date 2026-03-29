@@ -1,16 +1,11 @@
-/*
- * firestoreService.js
- * -------------------
- * All Firestore read/write operations in one place.
- * This keeps components clean and makes it easy to update queries later.
- */
-
 import {
   doc,
   setDoc,
   getDoc,
   getDocs,
   addDoc,
+  deleteDoc,
+  updateDoc,
   collection,
   query,
   where,
@@ -111,6 +106,60 @@ export async function getUserStrategies(uid) {
     console.warn("Error fetching strategies:", error.message);
     return [];
   }
+}
+
+/**
+ * Save a new strategy to Firestore.
+ *
+ * @param {string} uid          - User's Firebase Auth UID.
+ * @param {object} strategyData - Strategy fields (name, ticker, type, etc.).
+ * @returns {string}            - The new document ID.
+ */
+export async function saveStrategy(uid, strategyData) {
+  const docRef = await addDoc(collection(db, "strategies"), {
+    userId: uid,
+    name: strategyData.name,
+    ticker: strategyData.ticker,
+    type: strategyData.type || "sma_crossover",
+    shortWindow: strategyData.shortWindow || 10,
+    longWindow: strategyData.longWindow || 30,
+    initialCapital: strategyData.initialCapital || 10000,
+    status: strategyData.status || "draft",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+/**
+ * Update an existing strategy in Firestore.
+ *
+ * @param {string} strategyId   - Firestore document ID.
+ * @param {object} updates      - Fields to update.
+ */
+export async function updateStrategy(strategyId, updates) {
+  const stratRef = doc(db, "strategies", strategyId);
+  await updateDoc(stratRef, {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Update only the status of a strategy (e.g. "draft" → "active").
+ */
+export async function updateStrategyStatus(strategyId, status) {
+  await updateStrategy(strategyId, { status });
+}
+
+/**
+ * Delete a strategy from Firestore.
+ *
+ * @param {string} strategyId - Firestore document ID.
+ */
+export async function deleteStrategy(strategyId) {
+  const stratRef = doc(db, "strategies", strategyId);
+  await deleteDoc(stratRef);
 }
 
 /**

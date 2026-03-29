@@ -5,6 +5,8 @@ import {
   getUserStrategies,
   getUserBacktests,
   saveBacktestRun,
+  deleteStrategy,
+  updateStrategyStatus,
 } from "../services/firestoreService";
 
 const API_BASE = "http://localhost:8000";
@@ -27,6 +29,7 @@ export default function Dashboard() {
   const [btResult, setBtResult] = useState(null);
   const [btError, setBtError] = useState("");
   const [btSaved, setBtSaved] = useState(false);
+  const [btSourceStrategy, setBtSourceStrategy] = useState(null);
 
   // Available tickers
   const [tickers, setTickers] = useState([
@@ -39,6 +42,9 @@ export default function Dashboard() {
 
   // Backend status
   const [backendOnline, setBackendOnline] = useState(null);
+
+  // Strategy actions
+  const [deletingId, setDeletingId] = useState(null);
 
   /**
    * Fetch dashboard data + check backend health on mount.
@@ -67,7 +73,6 @@ export default function Dashboard() {
         if (res.ok) {
           const data = await res.json();
           setBackendOnline(true);
-          // Update tickers from backend if available
           if (data.available_tickers) {
             const tickerNames = {
               AAPL: "Apple Inc.",
@@ -132,10 +137,10 @@ export default function Dashboard() {
           ...data,
           short_window: btShortWindow,
           long_window: btLongWindow,
+          strategyName: btSourceStrategy?.name || data.strategy,
         });
         setBtSaved(true);
 
-        // Refresh backtests list
         const updatedBacktests = await getUserBacktests(currentUser.uid);
         setBacktests(updatedBacktests);
       } catch (saveErr) {
@@ -145,6 +150,53 @@ export default function Dashboard() {
       setBtError(err.message);
     }
     setBtRunning(false);
+  }
+
+  /**
+   * Load a saved strategy's parameters into the backtest form.
+   */
+  function handleRunFromStrategy(strategy) {
+    setBtTicker(strategy.ticker || "AAPL");
+    setBtShortWindow(strategy.shortWindow || 10);
+    setBtLongWindow(strategy.longWindow || 30);
+    setBtCapital(strategy.initialCapital || 10000);
+    setBtSourceStrategy(strategy);
+    setBtResult(null);
+    setBtError("");
+    setBtSaved(false);
+
+    // Scroll to backtest panel
+    document.getElementById("backtest-panel")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  /**
+   * Delete a strategy from Firestore.
+   */
+  async function handleDeleteStrategy(strategyId) {
+    if (!window.confirm("Delete this strategy? This cannot be undone.")) return;
+    setDeletingId(strategyId);
+    try {
+      await deleteStrategy(strategyId);
+      setStrategies((prev) => prev.filter((s) => s.id !== strategyId));
+    } catch (err) {
+      console.error("Failed to delete strategy:", err);
+    }
+    setDeletingId(null);
+  }
+
+  /**
+   * Toggle strategy status between draft and active.
+   */
+  async function handleToggleStatus(strategy) {
+    const newStatus = strategy.status === "active" ? "draft" : "active";
+    try {
+      await updateStrategyStatus(strategy.id, newStatus);
+      setStrategies((prev) =>
+        prev.map((s) => (s.id === strategy.id ? { ...s, status: newStatus } : s))
+      );
+    } catch (err) {
+      console.error("Failed to update status:", err);
+    }
   }
 
   async function handleLogout() {
@@ -214,6 +266,13 @@ export default function Dashboard() {
               {backendOnline ? "● API Online" : "● API Offline"}
             </span>
           )}
+          <button
+            onClick={() => navigate("/strategy-builder")}
+            className="nav-link-btn"
+            id="nav-strategy-builder"
+          >
+            + New Strategy
+          </button>
           <div className="user-avatar">
             {(userProfile?.displayName || currentUser?.email || "?")
               .charAt(0)
@@ -304,12 +363,107 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════
-            RUN BACKTEST PANEL
-            ═══════════════════════════════════════════ */}
-        <div className="backtest-panel">
+        {/* ═══ YOUR STRATEGIES (with actions) ═══ */}
+        <div className="data-card">
+          <div className="data-card-header">
+            <h2>📊 Your Strategies</h2>
+            <div className="data-card-actions">
+              <span className="data-count">{strategies.length} total</span>
+              <button
+                className="small-action-btn btn-accent"
+                onClick={() => navigate("/strategy-builder")}
+              >
+                + Create
+              </button>
+            </div>
+          </div>
+          {dataLoading ? (
+            <div className="data-loading">
+              <span className="btn-loader"></span>
+              <span>Loading strategies...</span>
+            </div>
+          ) : strategies.length === 0 ? (
+            <div className="data-empty">
+              <p>No strategies yet.</p>
+              <p className="data-empty-hint">
+                <button
+                  className="link-btn"
+                  onClick={() => navigate("/strategy-builder")}
+                >
+                  Create your first strategy →
+                </button>
+              </p>
+            </div>
+          ) : (
+            <div className="data-table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Ticker</th>
+                    <th>SMA</th>
+                    <th>Capital</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {strategies.map((s) => (
+                    <tr key={s.id} className={btSourceStrategy?.id === s.id ? "row-highlighted" : ""}>
+                      <td className="td-primary">{s.name || "Untitled"}</td>
+                      <td>{s.ticker || "—"}</td>
+                      <td>{s.shortWindow || 10}/{s.longWindow || 30}</td>
+                      <td>${(s.initialCapital || 10000).toLocaleString()}</td>
+                      <td>
+                        <button
+                          className={`table-badge clickable ${s.status === "active" ? "badge-green" : "badge-muted"}`}
+                          onClick={() => handleToggleStatus(s)}
+                          title="Click to toggle status"
+                        >
+                          {s.status || "draft"}
+                        </button>
+                      </td>
+                      <td>{formatDate(s.createdAt)}</td>
+                      <td>
+                        <div className="action-btns">
+                          <button
+                            className="small-action-btn btn-run"
+                            onClick={() => handleRunFromStrategy(s)}
+                            disabled={!backendOnline}
+                            title="Run backtest with this strategy"
+                          >
+                            ▶ Run
+                          </button>
+                          <button
+                            className="small-action-btn btn-danger"
+                            onClick={() => handleDeleteStrategy(s.id)}
+                            disabled={deletingId === s.id}
+                            title="Delete strategy"
+                          >
+                            {deletingId === s.id ? "..." : "✕"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ═══ RUN BACKTEST PANEL ═══ */}
+        <div className="backtest-panel" id="backtest-panel">
           <div className="backtest-panel-header">
-            <h2>🧪 Run Backtest</h2>
+            <h2>
+              🧪 Run Backtest
+              {btSourceStrategy && (
+                <span className="bt-source-label">
+                  from "{btSourceStrategy.name}"
+                </span>
+              )}
+            </h2>
             {!backendOnline && backendOnline !== null && (
               <span className="backend-warning">
                 FastAPI server not running — start it with: <code>uvicorn app.main:app --reload</code>
@@ -324,7 +478,7 @@ export default function Dashboard() {
                 <select
                   id="bt-ticker"
                   value={btTicker}
-                  onChange={(e) => setBtTicker(e.target.value)}
+                  onChange={(e) => { setBtTicker(e.target.value); setBtSourceStrategy(null); }}
                 >
                   {tickers.map((t) => (
                     <option key={t.symbol} value={t.symbol}>
@@ -342,7 +496,7 @@ export default function Dashboard() {
                   min="2"
                   max="49"
                   value={btShortWindow}
-                  onChange={(e) => setBtShortWindow(Number(e.target.value))}
+                  onChange={(e) => { setBtShortWindow(Number(e.target.value)); setBtSourceStrategy(null); }}
                 />
               </div>
 
@@ -354,7 +508,7 @@ export default function Dashboard() {
                   min="5"
                   max="100"
                   value={btLongWindow}
-                  onChange={(e) => setBtLongWindow(Number(e.target.value))}
+                  onChange={(e) => { setBtLongWindow(Number(e.target.value)); setBtSourceStrategy(null); }}
                 />
               </div>
 
@@ -367,7 +521,7 @@ export default function Dashboard() {
                   max="1000000"
                   step="100"
                   value={btCapital}
-                  onChange={(e) => setBtCapital(Number(e.target.value))}
+                  onChange={(e) => { setBtCapital(Number(e.target.value)); setBtSourceStrategy(null); }}
                 />
               </div>
             </div>
@@ -399,6 +553,9 @@ export default function Dashboard() {
                   <span className="text-muted" style={{ fontWeight: 400, fontSize: "0.85rem" }}>
                     SMA({btShortWindow}/{btLongWindow})
                   </span>
+                  {btSourceStrategy && (
+                    <span className="bt-source-tag">via "{btSourceStrategy.name}"</span>
+                  )}
                 </h3>
                 {btSaved && (
                   <span className="bt-saved-badge">✓ Saved to Firestore</span>
@@ -441,7 +598,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Trade list */}
               {btResult.trades.length > 0 && (
                 <div className="bt-trades-section">
                   <h4>Trade Log</h4>
@@ -550,54 +706,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Recent Strategies */}
-        <div className="data-card">
-          <div className="data-card-header">
-            <h2>📊 Your Strategies</h2>
-            <span className="data-count">{strategies.length} total</span>
-          </div>
-          {dataLoading ? (
-            <div className="data-loading">
-              <span className="btn-loader"></span>
-              <span>Loading strategies...</span>
-            </div>
-          ) : strategies.length === 0 ? (
-            <div className="data-empty">
-              <p>No strategies yet.</p>
-              <p className="data-empty-hint">
-                Strategies will appear here once you create them via the FastAPI backend.
-              </p>
-            </div>
-          ) : (
-            <div className="data-table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Created</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {strategies.map((s) => (
-                    <tr key={s.id}>
-                      <td className="td-primary">{s.name || "Untitled"}</td>
-                      <td>{s.type || "—"}</td>
-                      <td>{formatDate(s.createdAt)}</td>
-                      <td>
-                        <span className={`table-badge ${s.status === "active" ? "badge-green" : "badge-muted"}`}>
-                          {s.status || "draft"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
         {/* Account info card */}
         <div className="info-card">
           <h2>Account Details</h2>
@@ -645,12 +753,12 @@ export default function Dashboard() {
 
         {/* Coming soon */}
         <div className="coming-soon-card">
-          <h2>🚀 Coming in Phase 4</h2>
+          <h2>🚀 Coming in Phase 5</h2>
           <ul>
             <li>Live market data from real APIs</li>
-            <li>Custom trading strategy builder</li>
             <li>Advanced metrics &amp; equity charts</li>
             <li>Portfolio tracking &amp; performance reports</li>
+            <li>Strategy comparison tools</li>
           </ul>
         </div>
       </main>

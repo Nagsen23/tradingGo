@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import StrategyBuilder from "./pages/StrategyBuilder";
 import "./App.css";
 
 function App() {
@@ -21,6 +22,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/strategy-builder"
+            element={
+              <ProtectedRoute>
+                <StrategyBuilder />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
@@ -29,3 +38,4 @@ function App() {
 }
 
 export default App;
+
