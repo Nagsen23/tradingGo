@@ -14,7 +14,7 @@ yfinance>=0.2.36
 pandas>=2.0.0
 
 # Technical indicators (requires TA-Lib C library on host)
-# On Render: add build command: pip install ta-lib --prefer-binary
+# On Render: build command must include: pip install ta-lib --prefer-binary
 TA-Lib>=0.4.28
 
 # Memory caching
@@ -23,3 +23,7 @@ cachetools>=5.3.3
 # Numerical computing
 numpy>=1.26.4
 numba>=0.59.0
+
+# Phase 10 — Production infrastructure
+slowapi>=0.1.9           # Rate limiting
+sentry-sdk[fastapi]>=2.0.0  # Error tracking (optional — set SENTRY_DSN to enable)
