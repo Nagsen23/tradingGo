@@ -1,0 +1,22 @@
+# render.yaml — Render deployment configuration for tradingGo backend
+# Place this file in the repository root (or backend/ if deploying backend only)
+
+services:
+  - type: web
+    name: tradinggо-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install ta-lib --prefer-binary && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: CACHE_TTL_SECONDS
+        value: "300"
+      - key: DATA_PROVIDER
+        value: yfinance
+      - key: DEFAULT_INITIAL_CAPITAL
+        value: "10000"
+      - key: PYTHON_VERSION
+        value: "3.11.0"

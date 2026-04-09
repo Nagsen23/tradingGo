@@ -27,8 +27,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Temporary: open for development — restrict to frontend URL after deploy
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -107,6 +107,12 @@ class BacktestResponse(BaseModel):
 @app.get("/")
 def root():
     return {"message": "tradingGo API v0.4 — visit /docs for Swagger UI"}
+
+
+@app.get("/health")
+def health_check():
+    """Simple liveness probe used by Render and load balancers."""
+    return {"status": "ok"}
 
 
 @app.get("/api/health")

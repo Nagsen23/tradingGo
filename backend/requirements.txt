@@ -1,10 +1,25 @@
+# tradingGo Backend — Python dependencies
+# Deploy command: uvicorn app.main:app --host 0.0.0.0 --port 10000
+
+# Web framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+
+# Data validation
 pydantic>=2.0.0
-yfinance>=0.2.36
-TA-Lib>=0.4.28
 pydantic-settings>=2.2.1
+
+# Market data
+yfinance>=0.2.36
+pandas>=2.0.0
+
+# Technical indicators (requires TA-Lib C library on host)
+# On Render: add build command: pip install ta-lib --prefer-binary
+TA-Lib>=0.4.28
+
+# Memory caching
 cachetools>=5.3.3
-fastapi-cache2[redis]>=0.2.1
+
+# Numerical computing
 numpy>=1.26.4
 numba>=0.59.0
