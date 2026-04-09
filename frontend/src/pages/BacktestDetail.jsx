@@ -4,8 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getBacktestById } from "../services/firestoreService";
 import { EquityCurveChart, DrawdownChart } from "../components/BacktestCharts";
 import { formatTickerDisplay } from "../utils/formatters";
-
-const API_BASE = "http://localhost:8000";
+import { API_BASE } from "../services/api";
 
 export default function BacktestDetail() {
   const { id } = useParams();

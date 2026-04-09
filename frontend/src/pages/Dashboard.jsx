@@ -10,8 +10,7 @@ import {
 } from "../services/firestoreService";
 import { EquityCurveChart, DrawdownChart } from "../components/BacktestCharts";
 import { formatTickerDisplay } from "../utils/formatters";
-
-const API_BASE = "http://localhost:8000";
+import { API_BASE } from "../services/api";
 
 export default function Dashboard() {
   const { currentUser, userProfile, logout } = useAuth();

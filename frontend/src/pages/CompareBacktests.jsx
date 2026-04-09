@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { getUserBacktests } from "../services/firestoreService";
 import { OverlayChart } from "../components/BacktestCharts";
 import { formatTickerDisplay } from "../utils/formatters";
+import { API_BASE } from "../services/api";
 
-const API_BASE = "http://localhost:8000";
 const COLORS = ["#6366f1", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f43f5e"];
 
 export default function CompareBacktests() {
