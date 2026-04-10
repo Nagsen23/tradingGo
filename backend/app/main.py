@@ -223,75 +223,75 @@ def list_tickers():
 
 @app.post("/api/run-backtest", response_model=BacktestResponse)
 @limiter.limit("30/minute")         # max 30 backtests per IP per minute
-def run_backtest(request: BacktestRequest, http_request: Request):
+def run_backtest(request: Request, data: BacktestRequest):
     start_time = time.perf_counter()
 
     # Assemble effective params
-    effective_params = request.params.copy()
+    effective_params = data.params.copy()
 
     # Backwards compatibility: inject legacy top-level fields into params
-    if request.short_window is not None:
-        effective_params["short_window"] = request.short_window
-    if request.long_window is not None:
-        effective_params["long_window"] = request.long_window
+    if data.short_window is not None:
+        effective_params["short_window"] = data.short_window
+    if data.long_window is not None:
+        effective_params["long_window"] = data.long_window
 
-    if request.strategy not in STRATEGY_MAP:
-        logger.warning(f"Unknown strategy requested: '{request.strategy}'")
+    if data.strategy not in STRATEGY_MAP:
+        logger.warning(f"Unknown strategy requested: '{data.strategy}'")
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown strategy '{request.strategy}'. Available: {list(STRATEGY_MAP.keys())}",
+            detail=f"Unknown strategy '{data.strategy}'. Available: {list(STRATEGY_MAP.keys())}",
         )
 
-    validate_strategy_params(request.strategy, effective_params)
+    validate_strategy_params(data.strategy, effective_params)
 
     # Calculate required data length
-    if request.strategy in ["sma_crossover", "ema_crossover"]:
+    if data.strategy in ["sma_crossover", "ema_crossover"]:
         data_required = effective_params.get("long_window", 30)
-    elif request.strategy == "rsi":
+    elif data.strategy == "rsi":
         data_required = effective_params.get("rsi_period", 14) + 1
-    elif request.strategy == "macd":
+    elif data.strategy == "macd":
         data_required = max(
             effective_params.get("fast_period", 12),
             effective_params.get("slow_period", 26),
         ) + effective_params.get("signal_period", 9)
-    elif request.strategy == "bollinger":
+    elif data.strategy == "bollinger":
         data_required = effective_params.get("window", 20)
     else:
         data_required = 30
 
     try:
         price_data = fetch_historical_data(
-            ticker=request.ticker,
-            start_date=request.start_date,
-            end_date=request.end_date,
+            ticker=data.ticker,
+            start_date=data.start_date,
+            end_date=data.end_date,
         )
     except ValueError as e:
-        logger.warning(f"Data fetch failed for {request.ticker}: {e}")
+        logger.warning(f"Data fetch failed for {data.ticker}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
         validate_data_for_strategy(price_data, data_required)
     except ValueError as e:
-        logger.warning(f"Data validation failed for {request.ticker}: {e}")
+        logger.warning(f"Data validation failed for {data.ticker}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
     # Execute backtest
-    strategy_func = STRATEGY_MAP[request.strategy]
+    strategy_func = STRATEGY_MAP[data.strategy]
     result = execute_backtest_service(
-        ticker=request.ticker,
-        strategy=request.strategy,
+        ticker=data.ticker,
+        strategy=data.strategy,
         params=effective_params,
-        start_date=request.start_date,
-        end_date=request.end_date,
-        initial_capital=request.initial_capital,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        initial_capital=data.initial_capital,
         run_func=strategy_func,
         price_data=price_data,
     )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     logger.info(
-        f"Backtest complete | ticker={request.ticker.upper()} "
-        f"strategy={request.strategy} trades={result['metrics']['num_trades']} "
+        f"Backtest complete | ticker={data.ticker.upper()} "
+        f"strategy={data.strategy} trades={result['metrics']['num_trades']} "
         f"return={result['metrics']['total_return_pct']:.2f}% "
         f"from_cache={result.get('from_cache', False)} elapsed={elapsed_ms:.1f}ms"
     )
@@ -302,8 +302,8 @@ def run_backtest(request: BacktestRequest, http_request: Request):
     return BacktestResponse(
         success=True,
         from_cache=result.get("from_cache", False),
-        ticker=request.ticker.upper(),
-        strategy=request.strategy,
+        ticker=data.ticker.upper(),
+        strategy=data.strategy,
         params=effective_params,
         start_date=actual_start,
         end_date=actual_end,
